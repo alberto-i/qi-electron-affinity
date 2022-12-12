@@ -1,5 +1,5 @@
 {
-  "name": "qi-electron-affinity",
+  "name": "@precisao-i/electron-affinity",
   "version": "1.3.1",
   "description": "Electron IPC via simple method calls",
   "license": "MIT",
