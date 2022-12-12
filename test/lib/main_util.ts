@@ -28,6 +28,7 @@ export class Result {
   requestData: any;
   requestDataTests = "*missing*";
   replyData = "undefined";
+  callbackData: any;
   error: any = null;
   verified = false;
 }
@@ -133,6 +134,9 @@ export function createResultCollector(restorer: RestorerFunction) {
   });
   ipcMain.on("reply_data", (_event, data: any) => {
     resultCollector.currentResult.replyData = data;
+  });
+  ipcMain.on("callback_data", (_event, data: any) => {
+    resultCollector.currentResult.callbackData = data;
   });
   ipcMain.on("completed_test", (_event, error: any) => {
     resultCollector.currentResult.error = null;

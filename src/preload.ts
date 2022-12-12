@@ -19,4 +19,8 @@ contextBridge.exposeInMainWorld("_affinity_ipc", {
     // Don't pass along event as it includes `sender`
     ipcRenderer.on(channel, (_event, args) => func(args));
   },
+  onCallback: (callbackName: string, func: Function) => {
+    // Don't pass along event as it includes `sender`
+    ipcRenderer.on(callbackName, (_event, ...args) => func(...args));
+  },
 });

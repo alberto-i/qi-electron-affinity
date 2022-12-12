@@ -2,6 +2,73 @@
 
 Electron IPC via simple method calls
 
+## Changes from this version to the original library
+
+This version allows function callbacks to be passed as parameters to the Main API Calls.:
+
+```ts
+import type { ElectronMainApi } from 'electron-affinity/main'
+import type { BrowserWindow } from 'electron'
+
+import ping from 'ping'
+
+export type HostDetectionCallback = (isAlive: boolean) => void
+
+export class HostDetectionApi implements ElectronMainApi<HostDetectionApi> {
+  #callbacks: HostDetectionCallback[]
+
+  constructor() {
+    this.#callbacks = []
+    this.#enableHostDetection()
+  }
+
+  async onHostAvailabilityChange(callback: HostDetectionCallback): Promise<void> {
+    this.#callbacks.push(callback)
+  }
+
+  async removeListeners(): Promise<void> {
+    this.#callbacks = []
+  }
+
+  #enableHostDetection(): void {
+    setInterval(() => this.#detectHost(), 6000)
+  }
+
+  async #detectHost(): Promise<void> {
+    if (!this.#callbacks.length) {
+      return
+    }
+
+    const { alive } = await ping.promise.probe(process.env.REMOTE_HOST, { timeout: 2 })
+    for (const callback of this.#callbacks) {
+      // This will happen on the main thread and will be relayed to the renderer
+      callback(alive)
+    }
+  }
+}
+```
+
+And then, in the renderer thread:
+
+```ts
+const { onHostAvailabilityChange } = window.api.hostDetectionApi
+
+onHostAvailabilityChange((isAlive: boolean): void => {
+  if (isAlive) {
+    console.log(`Target host is alive`)
+  } else {
+    console.log(`Target host is unavailable`)
+  }
+})
+
+```
+
+Attention:
+
+- This works by creating a new channel between the window and the main thread.
+- This will only work passing a callback from the renderer thread to the main thread API, for now.
+- There is no way to remove the listener. You can clear the #callbacks in the example above to stop using the channel.
+
 ## Introduction
 
 Electron Affinity is a small TypeScript library that makes IPC as simple as possible in Electron. It has the following features:
@@ -724,7 +791,7 @@ The library was developed for the [ut-entomology/spectool](https://github.com/ut
 
 See also [the library common to '/main' and '/window'](#import-from-electron-affinitymain-or-electron-affinitywindow).
 
-#### type ElectronMainApi<T>
+#### type ElectronMainApi&lt;T>
 
 ```ts
 /**
@@ -748,7 +815,7 @@ type ElectronMainApi<T> = {
 }
 ```
 
-#### type WindowApiBinding<T>
+#### type WindowApiBinding&lt;T>
 
 ```ts
 /**
@@ -871,7 +938,7 @@ class RelayedError {
 
 See also [the library common to '/main' and '/window'](#import-from-electron-affinitymain-or-electron-affinitywindow).
 
-#### type ElectronWindowApi<T>
+#### type ElectronWindowApi&lt;T>
 
 ```ts
 /**
@@ -991,7 +1058,7 @@ function exposeWindowApi<T extends ElectronWindowApi<T>>(
 
 ### import from 'electron-affinity/main' or 'electron-affinity/window'
 
-#### type AwaitedType<F>
+#### type AwaitedType&lt;F>
 
 ```ts
 /**
@@ -1006,7 +1073,7 @@ type AwaitedType<F> = F extends (...args: any[]) => Promise<infer R>
   : never
 ```
 
-#### type RestorableClass<C>
+#### type RestorableClass&lt;C>
 
 ```ts
 /**

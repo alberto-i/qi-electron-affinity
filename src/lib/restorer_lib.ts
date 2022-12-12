@@ -40,6 +40,7 @@ interface RestorationInfo {
   argIndex?: number; // if not return value, index of argument in args list
   className: string; // name of the object's class
   isError: boolean; // whether the object subclasses Error
+  isCallback: boolean; // whether the argument is a function
 }
 
 /**
@@ -69,30 +70,45 @@ export function genericRestorer(
 }
 
 export namespace Restorer {
+  let callbackIx = 0;
+
   // Makes all the arguments of an argument list restorable.
-  export function makeArgsRestorable(args: any[]): void {
+  export function makeArgsRestorable(args: any[]) {
+    const callbacks = {} as {[key: string]: Function}
     const infos: RestorationInfo[] = [];
     if (args !== undefined) {
       for (let i = 0; i < args.length; ++i) {
         const info = Restorer.makeRestorationInfo(args[i]);
         if (info) {
           info.argIndex = i;
+
+          if (info.isCallback) {
+            const callbackName = `_affinity_event_callback_${++callbackIx}`
+            callbacks[callbackName] = args[i]
+            args[i] = callbackName
+          }
+
           infos.push(info);
         }
       }
     }
     // Passed argument list always ends with restoration information.
     args.push(infos);
+    return callbacks;
   }
 
   // Returns information needed to restore an object to its original class.
   export function makeRestorationInfo(obj: any): RestorationInfo | null {
-    if (obj === null || typeof obj != "object") {
+    if (obj === null) {
+      return null;
+    }
+    if (typeof obj != "object" && typeof obj != "function") {
       return null;
     }
     return {
       className: obj.constructor.name,
       isError: obj instanceof Error,
+      isCallback: typeof obj == 'function'
     };
   }
 
@@ -127,19 +143,29 @@ export namespace Restorer {
 
   // Restores argument list using provided restorer function.
   export function restoreArgs(args: any[], restorer?: RestorerFunction) {
+    const callbacks: { [key: string]: number } = {};
+
     if (args !== undefined) {
       const infos: RestorationInfo[] = args.pop();
       let infoIndex = 0;
       for (let argIndex = 0; argIndex < args.length; ++argIndex) {
+        const info = infoIndex < infos.length && argIndex == infos[infoIndex].argIndex
+        ? infos[infoIndex++]
+        : undefined
+
         args[argIndex] = Restorer.restoreValue(
           args[argIndex],
-          infoIndex < infos.length && argIndex == infos[infoIndex].argIndex
-            ? infos[infoIndex++]
-            : undefined,
+          info,
           restorer
         );
+
+        if (info && info.isCallback) {
+          callbacks[args[argIndex] as string] = argIndex
+        }
       }
     }
+
+    return callbacks
   }
 
   // Restores the class of an argument or return value when possible.

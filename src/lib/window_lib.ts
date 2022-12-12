@@ -34,6 +34,7 @@ declare global {
       invoke: (channel: string, data?: any) => Promise<any>;
       send: (channel: string, data: any) => void;
       on: (channel: string, func: (data: any) => void) => void;
+      onCallback: (callbackName: string, func: Function) => void;
     };
   }
 }
@@ -101,7 +102,10 @@ function _attemptBindMainApi<T>(
   const boundApi = {} as MainApiBinding<T>;
   for (const methodName of methodNames) {
     boundApi[methodName] = (async (...args: any[]) => {
-      Restorer.makeArgsRestorable(args);
+      const callbacks = Restorer.makeArgsRestorable(args);
+      for (const [eventName, callback] of Object.entries(callbacks)) {
+        window._affinity_ipc.onCallback(eventName, callback);
+      }
       const response = await window._affinity_ipc.invoke(
         toIpcName(apiClassName, methodName as string),
         args

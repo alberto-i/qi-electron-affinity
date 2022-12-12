@@ -117,7 +117,14 @@ export function exposeMainApi<T extends ElectronMainApi<T>>(
   exposeApi(_mainApiMap, mainApi, (ipcName, method) => {
     ipcMain.handle(ipcName, async (_event, args: any[]) => {
       try {
-        Restorer.restoreArgs(args, restorer);
+        const callbacks = Restorer.restoreArgs(args, restorer);
+
+        for (const [eventName, argIndex] of Object.entries(callbacks)) {
+          args[argIndex] = (...args: any) => {
+            _event.sender.send(eventName, ...args)
+          }
+        }
+
         //await before returning to keep Electron from writing errors
         const returnValue = await method.bind(mainApi)(...args);
         if (returnValue instanceof RelayedError) {
